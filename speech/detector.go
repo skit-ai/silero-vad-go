@@ -202,7 +202,7 @@ func (sd *Detector) Detect(pcm []float32) ([]Segment, error) {
 			return nil, fmt.Errorf("infer failed: %w", err)
 		}
 
-		sd.currSample += windowSize
+		// currSample is now incremented inside Infer()
 
 		if speechProb >= sd.cfg.Threshold && sd.tempEnd != 0 {
 			sd.tempEnd = 0
