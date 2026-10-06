@@ -13,13 +13,14 @@ import (
 )
 
 func (sd *Detector) Infer(samples []float32) (float32, error) {
-	pcm := samples
-	if sd.currSample > 0 {
-		// Append context from previous iteration.
-		pcm = append(sd.ctx[:], samples...)
-	}
-	// Save the last contextLen samples as context for the next iteration.
-	copy(sd.ctx[:], samples[len(samples)-contextLen:])
+	n := sd.contextLen()
+	// Prepend context from the previous window (zeros on the first window, as
+	// the reference implementation does) so every inference sees window+context.
+	pcm := make([]float32, 0, n+len(samples))
+	pcm = append(pcm, sd.ctx[:n]...)
+	pcm = append(pcm, samples...)
+	// Save the last n samples as context for the next iteration.
+	copy(sd.ctx[:n], samples[len(samples)-n:])
 	sd.currSample += len(samples)
 
 	// Create tensors

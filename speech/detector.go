@@ -12,8 +12,13 @@ import (
 )
 
 const (
-	stateLen   = 2 * 1 * 128
-	contextLen = 64
+	stateLen = 2 * 1 * 128
+	// Silero v5 prepends the tail of the previous window to each new window as
+	// acoustic context: 64 samples at 16 kHz, 32 samples at 8 kHz (both 4 ms).
+	// maxContextLen sizes the buffer; contextLen() picks the per-rate value.
+	maxContextLen   = 64
+	contextLen16kHz = 64
+	contextLen8kHz  = 32
 )
 
 type LogLevel int
@@ -93,7 +98,7 @@ type Detector struct {
 	cfg DetectorConfig
 
 	state [stateLen]float32
-	ctx   [contextLen]float32
+	ctx   [maxContextLen]float32
 
 	currSample int
 	triggered  bool
@@ -262,7 +267,7 @@ func (sd *Detector) Reset() error {
 	for i := 0; i < stateLen; i++ {
 		sd.state[i] = 0
 	}
-	for i := 0; i < contextLen; i++ {
+	for i := 0; i < maxContextLen; i++ {
 		sd.ctx[i] = 0
 	}
 
@@ -283,4 +288,16 @@ func (sd *Detector) Destroy() error {
 	}
 
 	return nil
+}
+
+// contextLen returns the number of trailing samples from the previous window
+// that are prepended to the next one. Using the 16 kHz value at 8 kHz feeds the
+// model a 320-sample window instead of the 288 it was trained on, which inflates
+// speech probability on short transients (clicks, knocks) and depresses it on
+// real speech.
+func (sd *Detector) contextLen() int {
+	if sd.cfg.SampleRate == 8000 {
+		return contextLen8kHz
+	}
+	return contextLen16kHz
 }
